@@ -119,6 +119,6 @@
         <source-file src="src/android/src/com/thomas/hikvision/PlaySurfaceViewCallBack.java" target-dir="src/com/thomas/hikvision"/>
         <source-file src="src/android/src/com/thomas/hikvision/ScreenTest.java" target-dir="src/com/thomas/hikvision"/>
         <source-file src="src/android/src/com/thomas/hikvision/VoiceTalk.java" target-dir="src/com/thomas/hikvision"/>
-        <source-file src="src/android/src/com/thomas/hikvision/VoiceTalk.java" target-dir="src/com/thomas/hikvision"/>
+        <source-file src="src/android/src/com/thomas/hikvision/WheelView.java" target-dir="src/com/thomas/hikvision"/>
     </platform>
 </plugin>
