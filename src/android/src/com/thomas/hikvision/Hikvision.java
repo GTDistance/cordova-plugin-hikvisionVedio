@@ -3,7 +3,6 @@ package com.thomas.hikvision;
 import android.content.Context;
 import android.content.Intent;
 
-import com.thomas.xunfeilistenspeaking.XunfeiDialogActivity;
 
 import org.apache.cordova.CallbackContext;
 import org.apache.cordova.CordovaPlugin;
