@@ -9,18 +9,22 @@
 package com.thomas.hikvision;
 
 import android.app.Activity;
+import android.app.Dialog;
+import android.content.Context;
 import android.content.Intent;
 import android.graphics.Color;
 import android.graphics.drawable.ColorDrawable;
 import android.os.Bundle;
 import android.util.DisplayMetrics;
 import android.util.Log;
+import android.view.Display;
 import android.view.Gravity;
 import android.view.SurfaceHolder;
 import android.view.View;
 import android.view.View.OnClickListener;
 import android.view.ViewGroup;
 import android.view.Window;
+import android.view.WindowManager;
 import android.widget.AbsListView;
 import android.widget.AdapterView;
 import android.widget.BaseAdapter;
@@ -38,6 +42,7 @@ import com.hikvision.netsdk.HCNetSDK;
 import com.hikvision.netsdk.INT_PTR;
 import com.hikvision.netsdk.NET_DVR_DEVICEINFO_V30;
 
+import java.util.Arrays;
 import java.util.List;
 
 
@@ -122,23 +127,25 @@ public class HikvisionActivity extends Activity {
 			cameraNum = winNum;
 		}
 	}
-	private PopupWindow window;
-	private ListView titleListView;
+	private Dialog mDialog;
+	private int position = 0;
+	private int offset = 2;
 	private void initPopupWindow() {
 
-		// 构建一个popupwindow的布局
-		View popupView = getLayoutInflater().inflate(getIdTypeLayout("popupwindow_list"), null);
-
-//        // 为了演示效果，简单的设置了一些数据，实际中大家自己设置数据即可，相信大家都会。
-//        ListView lsvMore = (ListView) popupView.findViewById(R.id.lsvMore);
-		titleListView = (ListView) popupView.findViewById(getIdTypeId("hikvision_lv_title"));
-//		titleListView.setAdapter(new ArrayAdapter<String>(this, android.R.layout.simple_list_item_1, datas));
-		titleListView.setAdapter(new MyListAdapter());
-//		titleListView.setAdapter(new MyListAdapter());
-		titleListView.setOnItemClickListener(new AdapterView.OnItemClickListener() {
+		mDialog = new Dialog(this,getId("transparent_dialog","style"));
+		View outerView = getLayoutInflater().inflate(getIdTypeLayout("wheel_view"), null);
+		mDialog.setContentView(outerView);
+		WheelView wv = (WheelView) outerView.findViewById(getIdTypeId("wheel_view_wv"));
+		outerView.findViewById(getIdTypeId("wheel_view_cancel")).setOnClickListener(new OnClickListener() {
 			@Override
-			public void onItemClick(AdapterView<?> parent, View view, final int position, long id) {
-				window.dismiss();
+			public void onClick(View v) {
+				mDialog.dismiss();
+			}
+		});
+		outerView.findViewById(getIdTypeId("wheel_view_complete")).setOnClickListener(new OnClickListener() {
+			@Override
+			public void onClick(View v) {
+				mDialog.dismiss();
 				tv_title.setText(datas[position]);
 				stopMultiPreview();
 				// whether we have logout
@@ -151,23 +158,58 @@ public class HikvisionActivity extends Activity {
 				changeCanteen(position);
 				login();
 				ChangeSingleSurFace();
-
 			}
 		});
-		// 创建PopupWindow对象，指定宽度和高度
-		window = new PopupWindow(popupView,  LinearLayout.LayoutParams.MATCH_PARENT,
-				LinearLayout.LayoutParams.WRAP_CONTENT);
-		// 设置动画
-//        window.setAnimationStyle(R.style.popup_window_anim);
-		// 设置背景颜色
-		window.setBackgroundDrawable(new ColorDrawable(Color.parseColor("#F8F8F8")));
-		//  设置可以获取焦点
-		window.setFocusable(true);
-		// 设置可以触摸弹出框以外的区域
-		window.setOutsideTouchable(true);
-		// 更新popupwindow的状态
-		window.update();
+		wv.setOffset(offset);
+		wv.setItems(Arrays.asList(datas));
+		wv.setOnWheelViewListener(new WheelView.OnWheelViewListener() {
+			@Override
+			public void onSelected(int selectedIndex, String item) {
+				Log.d(TAG, "[Dialog]selectedIndex: " + selectedIndex + ", item: " + item);
+				position = selectedIndex-offset;
+			}
+		});
+		// 在底部显示
+		Window mWindow = mDialog.getWindow();
+		mWindow.setWindowAnimations(getId("dialog_animation","style"));
+		mWindow.setGravity(Gravity.BOTTOM);
+		setAspectRatio(mDialog,1,0);
+
 	}
+
+	/**
+	 * 设置Dialog对话框相对于屏幕的宽高显示的比例
+	 *
+	 * @param dialog
+	 *            Dialog对话框对象
+	 * @param widthRatio
+	 *            Dialog对话框相对于屏幕的宽度显示的比例，如果widthRatio <= 0，则默认0.9
+	 * @param heightRatio
+	 *            Dialog对话框相对于屏幕的高度显示的比例，如果heightRatio <= 0，则默认wrap_content
+	 */
+	public void setAspectRatio(Dialog dialog, double widthRatio, double heightRatio) {
+		// 获取WindowManager的两种方式
+		WindowManager wm = (WindowManager) getSystemService(Context.WINDOW_SERVICE);
+		// WindowManager wm = ((Activity) mContext).getWindowManager();
+		// 获取屏幕宽、高用
+		Display d = wm.getDefaultDisplay();
+		// 获取对话框当前的参数值
+		WindowManager.LayoutParams lp = dialog.getWindow().getAttributes();
+
+		// 设置Dialog的宽度
+		if (widthRatio <= 0) {
+			lp.width = (int) (d.getWidth() * 0.9);
+		} else {
+			lp.width = (int) (d.getWidth() * widthRatio);
+		}
+		// 设置Dialog的高度
+		if (heightRatio > 0) {
+			lp.height = (int) (d.getHeight() * heightRatio);
+		}
+
+		dialog.getWindow().setAttributes(lp);
+	}
+
 	private int getIdTypeLayout(String name){
 		return getId(name,"layout");
 	}
@@ -388,7 +430,8 @@ public class HikvisionActivity extends Activity {
 	private OnClickListener ChangeTitle_Listener = new OnClickListener() {
 		@Override
 		public void onClick(View v) {
-			window.showAsDropDown(tv_title);
+//			window.showAsDropDown(tv_title);
+			mDialog.show();
 		}
 	};
 
