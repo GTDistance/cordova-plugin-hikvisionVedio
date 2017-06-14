@@ -107,7 +107,7 @@ public class HikvisionActivity extends Activity {
 		}
 		changeCanteen(0);
 	}
-	private int winNum;
+//	private int winNum;
 	private int cameraNum;
 	private String ip ;
 	private String port ;
@@ -116,16 +116,16 @@ public class HikvisionActivity extends Activity {
 	private String title;
 	private void changeCanteen(int index){
 		CanteenBean canteenBean = canteenBeanList.get(index);
-		winNum = Integer.valueOf(canteenBean.getWinNum());
+//		winNum = Integer.valueOf(canteenBean.getWinNum());
 		cameraNum = canteenBean.getCameraNum();
 		ip = canteenBean.getPortId();
 		port = canteenBean.getAppPortNo();
 		userName = canteenBean.getUserName();
 		password = canteenBean.getPwd();
 		title = canteenBean.getCanteenName();
-		if(winNum<cameraNum){
-			cameraNum = winNum;
-		}
+//		if(winNum<cameraNum){
+//			cameraNum = winNum;
+//		}
 	}
 	private Dialog mDialog;
 	private int position = 0;
