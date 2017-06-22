@@ -321,6 +321,9 @@ public class HikvisionActivity extends Activity {
 						PlaySurfaceView playSurfaceView = (PlaySurfaceView) v;
 						int index = playSurfaceView.getIndex();
 						if(playSurfaceView.getM_iPreviewHandle()<0){
+							Toast toast = Toast.makeText(HikvisionActivity.this,"预览失败！",Toast.LENGTH_LONG);
+							toast.setGravity(Gravity.CENTER, 0, 0);
+							toast.show();
 							return;
 						}
 						Intent intent = new Intent(HikvisionActivity.this,HikvisionSingleActivity.class);
@@ -331,7 +334,6 @@ public class HikvisionActivity extends Activity {
 						intent.putExtra("password",password);
 						intent.putExtra("index",index);
 						intent.putExtra("m_iStartChan",m_iStartChan);
-//						stopMultiPreview();
 						startActivity(intent);
 					}
 				});
