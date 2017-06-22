@@ -1,21 +1,21 @@
 package com.thomas.hikvision;
 
 import android.app.Activity;
+import android.app.Fragment;
 import android.content.Intent;
 import android.graphics.Color;
 import android.graphics.drawable.ColorDrawable;
+import android.graphics.drawable.GradientDrawable;
+import android.os.AsyncTask;
 import android.os.Bundle;
 import android.os.Environment;
 import android.util.DisplayMetrics;
 import android.util.Log;
+import android.view.Gravity;
 import android.view.SurfaceHolder;
 import android.view.View;
 import android.view.Window;
-import android.widget.Button;
-import android.widget.FrameLayout;
-import android.widget.LinearLayout;
-import android.widget.PopupWindow;
-import android.widget.TextView;
+import android.widget.*;
 
 import com.hikvision.netsdk.ExceptionCallBack;
 import com.hikvision.netsdk.HCNetSDK;
@@ -55,7 +55,6 @@ public class HikvisionSingleActivity extends Activity implements View.OnClickLis
     private String userName ;
     private String password ;
     private int index = 0;
-
     private String channelName;
 
 
@@ -66,17 +65,22 @@ public class HikvisionSingleActivity extends Activity implements View.OnClickLis
         super.onCreate(savedInstanceState);
         this.requestWindowFeature(Window.FEATURE_NO_TITLE);//去掉标题栏 第一种方法
         setContentView(getIdTypeLayout("activity_hikvision_singleshow"));
-        findViews();
         getParams();
+        getChannelName();
+        findViews();
         canvasView();
         initPopupWindow();
-        setListeners();
+//        setListeners();
     }
 
 
+    private void getChannelName(){
+        new MyChannelNameTask().execute("");
+    }
 
     private void findViews() {
         title = (TextView) findViewById(getIdTypeId("single_tx_title"));
+        title.setText("");
         singleFL = (FrameLayout) findViewById(getIdTypeId("single_sur_player"));
         findViewById(getIdTypeId("single_btn_back")).setOnClickListener(this);
         more = (Button) findViewById(getIdTypeId("single_btn_more"));
@@ -104,33 +108,75 @@ public class HikvisionSingleActivity extends Activity implements View.OnClickLis
     private void canvasView() {
         DisplayMetrics metric = new DisplayMetrics();
         getWindowManager().getDefaultDisplay().getMetrics(metric);
+
         playSurfaceView = new PlaySurfaceView(this,0);
         playSurfaceView.setParam(metric.widthPixels * 2);
         FrameLayout.LayoutParams params = new FrameLayout.LayoutParams(FrameLayout.LayoutParams.WRAP_CONTENT,
                 FrameLayout.LayoutParams.WRAP_CONTENT);
+
+        singleFL.addView(playSurfaceView,params);
+
+//        final FrameLayout loadingFL = new FrameLayout(this);
+//        FrameLayout.LayoutParams loadingFLParames = new FrameLayout.LayoutParams(metric.widthPixels,metric.widthPixels);
+//
+//
+//        LinearLayout loadingLL = new LinearLayout(this);
+//        FrameLayout.LayoutParams loadingLLParames = new FrameLayout.LayoutParams(FrameLayout.LayoutParams.WRAP_CONTENT,
+//                FrameLayout.LayoutParams.WRAP_CONTENT);
+//        loadingLLParames.gravity = Gravity.CENTER;
+//        loadingLL.setOrientation(LinearLayout.VERTICAL);
+//
+//        ProgressBar progressBar = new ProgressBar(this);//进度圈圈
+//        LinearLayout.LayoutParams progressBararams = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT,
+//                LinearLayout.LayoutParams.WRAP_CONTENT);
+//        progressBararams.gravity = Gravity.CENTER_HORIZONTAL;
+//        loadingLL.addView(progressBar,progressBararams);
+//
+//        TextView textView = new TextView(this);//进度说明
+//        LinearLayout.LayoutParams textViewParams = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT,
+//                LinearLayout.LayoutParams.WRAP_CONTENT);
+//        textViewParams.gravity = Gravity.CENTER_HORIZONTAL;
+//        textView.setText("Loading~~~");
+//        textView.setTextColor(Color.parseColor("#FFFFFF"));
+//        loadingLL.addView(textView,textViewParams);
+
+//        loadingFL.addView(loadingLL,loadingLLParames);
+
+
+//        loadingFL.setVisibility(View.VISIBLE);
+//        singleFL.addView(loadingFL,loadingFLParames);
         playSurfaceView.setPlaySurfaceViewCallBack(new PlaySurfaceViewCallBack() {
             @Override
             public void surfaceCreated(SurfaceHolder surfaceHolder, int i) {
                 playSurfaceView.startPreview(m_iLogID,m_iStartChan+index);
-                channelName  = getChannelName();
-                title.setText(channelName);
+//                new MyChannelNameTask().execute("");
             }
         });
-        singleFL.addView(playSurfaceView,params);
+
     }
 
-    private String  getChannelName() {
-        String channelName = "";
-        try {
-            NET_DVR_PICCFG_V30 netDvrPiccfgV30 = new NET_DVR_PICCFG_V30();
-            HCNetSDK.getInstance().NET_DVR_GetDVRConfig(m_iLogID,HCNetSDK.NET_DVR_GET_PICCFG_V30,m_iStartChan+index,netDvrPiccfgV30);
-            channelName = new String(netDvrPiccfgV30.sChanName,"GB2312").trim();
-        } catch (UnsupportedEncodingException e) {
-            e.printStackTrace();
+    class MyChannelNameTask extends AsyncTask<String,Integer,String>{
+
+        @Override
+        protected String  doInBackground(String... strings) {
+            String channelName = "";
+            try {
+                NET_DVR_PICCFG_V30 netDvrPiccfgV30 = new NET_DVR_PICCFG_V30();
+                HCNetSDK.getInstance().NET_DVR_GetDVRConfig(m_iLogID,HCNetSDK.NET_DVR_GET_PICCFG_V30,m_iStartChan+index,netDvrPiccfgV30);
+                channelName = new String(netDvrPiccfgV30.sChanName,"GB2312").trim();
+            } catch (UnsupportedEncodingException e) {
+                e.printStackTrace();
+            }
+            return channelName;
         }
-        return channelName;
-    }
 
+        @Override
+        protected void onPostExecute(String s) {
+            super.onPostExecute(s);
+            channelName = s;
+            title.setText(s);
+        }
+    }
     private void login(){
         try {
             if (m_iLogID < 0) {

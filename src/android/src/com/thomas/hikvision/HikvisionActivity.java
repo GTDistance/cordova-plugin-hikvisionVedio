@@ -14,6 +14,7 @@ import android.content.Context;
 import android.content.Intent;
 import android.graphics.Color;
 import android.graphics.drawable.ColorDrawable;
+import android.os.AsyncTask;
 import android.os.Bundle;
 import android.util.DisplayMetrics;
 import android.util.Log;
@@ -63,17 +64,27 @@ public class HikvisionActivity extends Activity {
 	private NET_DVR_DEVICEINFO_V30 m_oNetDvrDeviceInfoV30 = null;
 
 	private int m_iLogID = -1; // return by NET_DVR_Login_v30
-	private int m_iPlaybackID = -1; // return by NET_DVR_PlayBackByTime
 
 	private int m_iPort = -1; // play port
 	private int m_iStartChan = 0; // start channel no
-//	private int m_iChanNum = 0; // channel number
 	private static PlaySurfaceView[] playView ;
-
 	private final String TAG = "HikvisonActivity";
-
-
 	private List<CanteenBean> canteenBeanList;
+	private String[] datas;
+
+	private Dialog mDialog;
+	private int oldPosition = 0;
+	private int position = 0;
+	private int offset = 2;
+
+	private int cameraNum;
+	private String ip ;
+	private String port ;
+	private String userName ;
+	private String password ;
+	private String title;
+
+	private boolean loginFlag = false;
 
 	/** Called when the activity is first created. */
 	@Override
@@ -93,9 +104,10 @@ public class HikvisionActivity extends Activity {
 			return;
 		}
 		initPopupWindow();
+		new MyLoginAsyncTask().execute("");
+		ChangeSingleSurFace();
 	}
 
-	private String[] datas;
 	private void getParams(){
 		Intent intent = getIntent();
 		String array = intent.getStringExtra("array");
@@ -107,31 +119,18 @@ public class HikvisionActivity extends Activity {
 		}
 		changeCanteen(0);
 	}
-//	private int winNum;
-	private int cameraNum;
-	private String ip ;
-	private String port ;
-	private String userName ;
-	private String password ;
-	private String title;
+
 	private void changeCanteen(int index){
 		CanteenBean canteenBean = canteenBeanList.get(index);
-//		winNum = Integer.valueOf(canteenBean.getWinNum());
 		cameraNum = canteenBean.getCameraNum();
 		ip = canteenBean.getPortId();
 		port = canteenBean.getAppPortNo();
 		userName = canteenBean.getUserName();
 		password = canteenBean.getPwd();
 		title = canteenBean.getCanteenName();
-//		if(winNum<cameraNum){
-//			cameraNum = winNum;
-//		}
 	}
-	private Dialog mDialog;
-	private int position = 0;
-	private int offset = 2;
-	private void initPopupWindow() {
 
+	private void initPopupWindow() {
 		mDialog = new Dialog(this,getId("transparent_dialog","style"));
 		View outerView = getLayoutInflater().inflate(getIdTypeLayout("wheel_view"), null);
 		mDialog.setContentView(outerView);
@@ -146,18 +145,15 @@ public class HikvisionActivity extends Activity {
 			@Override
 			public void onClick(View v) {
 				mDialog.dismiss();
-				tv_title.setText(datas[position]);
-				stopMultiPreview();
-				// whether we have logout
-				HCNetSDK.getInstance().NET_DVR_Logout_V30(m_iLogID);
-				surfaceView.removeAllViews();
-				for (int i = 0;i<cameraNum;i++){
-					playView[i] = null;
+				if (position ==oldPosition){
+					return;
 				}
-				m_iLogID = -1;
+				oldPosition = position;
+				tv_title.setText(datas[position]);
+				logout();
 				changeCanteen(position);
-				login();
-				ChangeSingleSurFace();
+				logindraw();
+
 			}
 		});
 		wv.setOffset(offset);
@@ -175,6 +171,47 @@ public class HikvisionActivity extends Activity {
 		mWindow.setGravity(Gravity.BOTTOM);
 		setAspectRatio(mDialog,1,0);
 
+	}
+
+	/**
+	 * 登录和绘制窗口
+	 */
+	private void logindraw(){
+		new MyLoginAsyncTask().execute("");
+		ChangeSingleSurFace();
+	}
+	/**
+	 * 登出
+	 */
+	private void logout(){
+		new MyLogoutAsyncTask().execute("");
+	}
+
+	class MyLogoutAsyncTask extends AsyncTask<String,Integer,Integer>{
+		@Override
+		protected void onPreExecute() {
+			super.onPreExecute();
+			loginFlag = false;
+			stopMultiPreview();
+			surfaceView.removeAllViews();
+			for (int i = 0;i<cameraNum;i++){
+				playView[i] = null;
+			}
+			m_iLogID = -1;
+		}
+
+		@Override
+		protected Integer doInBackground(String... strings) {
+			// whether we have logout
+			if (m_iLogID>=0)
+				HCNetSDK.getInstance().NET_DVR_Logout_V30(m_iLogID);
+			return null;
+		}
+
+		@Override
+		protected void onPostExecute(Integer integer) {
+			super.onPostExecute(integer);
+		}
 	}
 
 	/**
@@ -248,8 +285,7 @@ public class HikvisionActivity extends Activity {
 		getParams();
 		findViews();
 		setListeners();
-		login();
-		ChangeSingleSurFace();
+
 		return true;
 	}
 	// get controller instance
@@ -302,52 +338,12 @@ public class HikvisionActivity extends Activity {
 				playView[i].setPlaySurfaceViewCallBack(new PlaySurfaceViewCallBack() {
 					@Override
 					public void surfaceCreated(SurfaceHolder surfaceHolder, int index) {
-						playView[index].startPreview(m_iLogID, m_iStartChan + index);
+						new MyStartPreviewTask().execute(index);
 					}
 				});
 			}
 		}
 	}
-
-
-	private void login(){
-		try {
-			if (m_iLogID < 0) {
-				// login on the device
-				m_iLogID = loginNormalDevice();
-				if (m_iLogID < 0) {
-					Log.e(TAG, "This device logins failed!");
-					Toast toast = Toast.makeText(HikvisionActivity.this,"登录失败！",Toast.LENGTH_LONG);
-					toast.setGravity(Gravity.CENTER, 0, 0);
-					toast.show();
-					return;
-				} else {
-					System.out.println("m_iLogID=" + m_iLogID);
-				}
-				// get instance of exception callback and set
-				ExceptionCallBack oexceptionCbf = getExceptiongCbf();
-				if (oexceptionCbf == null) {
-					Log.e(TAG, "ExceptionCallBack object is failed!");
-					return;
-				}
-				if (!HCNetSDK.getInstance().NET_DVR_SetExceptionCallBack(oexceptionCbf)) {
-					Log.e(TAG, "NET_DVR_SetExceptionCallBack is failed!");
-					return;
-				}
-				Log.i(TAG, "Login sucess ****************************1***************************");
-			} else {
-				// whether we have logout
-				if (!HCNetSDK.getInstance().NET_DVR_Logout_V30(m_iLogID)) {
-					Log.e(TAG, " NET_DVR_Logout is failed!");
-					return;
-				}
-				m_iLogID = -1;
-			}
-		} catch (Exception err) {
-			Log.e(TAG, "error: " + err.toString());
-		}
-	}
-
 
 	private int loginNormalDevice() {
 		// get instance
@@ -367,7 +363,6 @@ public class HikvisionActivity extends Activity {
 			Log.e(TAG, "NET_DVR_Login is failed!Err:" + HCNetSDK.getInstance().NET_DVR_GetLastError());
 			return -1;
 		}
-
 
 		if (m_oNetDvrDeviceInfoV30.byChanNum > 0) {
 			m_iStartChan = m_oNetDvrDeviceInfoV30.byStartChan;
@@ -403,20 +398,6 @@ public class HikvisionActivity extends Activity {
 		}
 	}
 
-	public static void Test_XMLAbility(int iUserID) {
-		byte[] arrayOutBuf = new byte[64 * 1024];
-		INT_PTR intPtr = new INT_PTR();
-		String strInput = new String("<AlarmHostAbility version=\"2.0\"></AlarmHostAbility>");
-		byte[] arrayInBuf = new byte[8 * 1024];
-		arrayInBuf = strInput.getBytes();
-		if (!HCNetSDK.getInstance().NET_DVR_GetXMLAbility(iUserID, HCNetSDK.DEVICE_ABILITY_INFO, arrayInBuf,
-				strInput.length(), arrayOutBuf, 64 * 1024, intPtr)) {
-			System.out.println("get DEVICE_ABILITY_INFO faild!" + " err: "
-					+ HCNetSDK.getInstance().NET_DVR_GetLastError());
-		} else {
-			System.out.println("get DEVICE_ABILITY_INFO succ!");
-		}
-	}
 
 	private ExceptionCallBack getExceptiongCbf() {
 		ExceptionCallBack oExceptionCbf = new ExceptionCallBack() {
@@ -430,7 +411,6 @@ public class HikvisionActivity extends Activity {
 	private OnClickListener ChangeTitle_Listener = new OnClickListener() {
 		@Override
 		public void onClick(View v) {
-//			window.showAsDropDown(tv_title);
 			mDialog.show();
 		}
 	};
@@ -449,50 +429,63 @@ public class HikvisionActivity extends Activity {
 	}
 
 	private void finishThisActivity(){
-		stopMultiPreview();
-		// whether we have logout
-		HCNetSDK.getInstance().NET_DVR_Logout_V30(m_iLogID);
-		surfaceView.removeAllViews();
-		for (int i = 0;i<cameraNum;i++){
-			playView[i] = null;
-		}
-		m_iLogID = -1;
+		logout();
 		finish();
 	}
 
-	class MyListAdapter extends BaseAdapter {
+
+
+	class MyStartPreviewTask extends AsyncTask<Integer,Integer,Integer>{
 
 		@Override
-		public int getCount() {
-			return datas.length;
+		protected Integer doInBackground(Integer... integers) {
+			while (!loginFlag);
+			return integers[0];
 		}
 
 		@Override
-		public Object getItem(int position) {
-			return datas[position];
+		protected void onPostExecute(Integer integer) {
+			super.onPostExecute(integer);
+			playView[integer].startPreview(m_iLogID, m_iStartChan + integer);
+		}
+	}
+	class MyLoginAsyncTask extends AsyncTask<String,Integer,Integer>{
+		@Override
+		protected void onPreExecute() {
+			super.onPreExecute();
+			loginFlag = false;
+			m_iLogID=-1;
+		}
+		@Override
+		protected Integer doInBackground(String... strings) {
+
+			return loginNormalDevice();
 		}
 
 		@Override
-		public long getItemId(int position) {
-			return position;
-		}
-
-		@Override
-		public View getView(int position, View convertView, ViewGroup parent) {
-			TextView textView;
-			if (convertView == null) {
-				textView = new TextView(HikvisionActivity.this);
-				textView.setLayoutParams(new AbsListView.LayoutParams(AbsListView.LayoutParams.MATCH_PARENT, AbsListView.LayoutParams.WRAP_CONTENT));//设置TextView对象布局
-				textView.setPadding(10,20,10,20);
-				textView.setTextSize(20);
-				textView.setGravity(Gravity.CENTER);
-
+		protected void onPostExecute(Integer integer) {
+			super.onPostExecute(integer);
+			loginFlag = true;
+			m_iLogID = integer;
+			System.out.println("m_iLogID=" + m_iLogID);
+			if (m_iLogID < 0) {
+				Log.e(TAG, "This device logins failed!");
+				Toast toast = Toast.makeText(HikvisionActivity.this,"登录失败！",Toast.LENGTH_LONG);
+				toast.setGravity(Gravity.CENTER, 0, 0);
+				toast.show();
+				return;
 			}
-			else {
-				textView = (TextView) convertView;
+			// get instance of exception callback and set
+			ExceptionCallBack oexceptionCbf = getExceptiongCbf();
+			if (oexceptionCbf == null) {
+				Log.e(TAG, "ExceptionCallBack object is failed!");
+				return;
 			}
-			textView.setText(datas[position]);
-			return textView;
+			if (!HCNetSDK.getInstance().NET_DVR_SetExceptionCallBack(oexceptionCbf)) {
+				Log.e(TAG, "NET_DVR_SetExceptionCallBack is failed!");
+				return;
+			}
+			Log.i(TAG, "Login sucess ****************************1***************************");
 		}
 	}
 }

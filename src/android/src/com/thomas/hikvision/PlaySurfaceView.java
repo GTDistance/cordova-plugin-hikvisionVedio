@@ -4,19 +4,26 @@ import android.annotation.SuppressLint;
 import android.app.Activity;
 import android.content.Context;
 import android.graphics.PixelFormat;
+import android.os.AsyncTask;
+import android.os.Handler;
 import android.util.Log;
 import android.view.SurfaceHolder;
 import android.view.SurfaceHolder.Callback;
 import android.view.SurfaceView;
 
+import android.view.View;
+import android.widget.ProgressBar;
 import com.hikvision.netsdk.HCNetSDK;
 import com.hikvision.netsdk.NET_DVR_PREVIEWINFO;
+import com.hikvision.netsdk.RealPlayCallBack;
 
 @SuppressLint("NewApi")
 public class PlaySurfaceView extends SurfaceView implements Callback {
 
     private final String TAG = "PlaySurfaceView";
+    private Activity activity;
     private int m_iWidth = 0;
+    private ProgressBar progressBar;
     public int getM_iWidth() {
         return m_iWidth;
     }
@@ -51,9 +58,6 @@ public class PlaySurfaceView extends SurfaceView implements Callback {
 
     private PlaySurfaceViewCallBack playSurfaceViewCallBack;
 
-    public PlaySurfaceViewCallBack getPlaySurfaceViewCallBack() {
-        return playSurfaceViewCallBack;
-    }
 
     public void setPlaySurfaceViewCallBack(PlaySurfaceViewCallBack playSurfaceViewCallBack) {
         this.playSurfaceViewCallBack = playSurfaceViewCallBack;
@@ -62,6 +66,7 @@ public class PlaySurfaceView extends SurfaceView implements Callback {
     public PlaySurfaceView(Activity demoActivity, int index) {
         super( demoActivity);
         // TODO Auto-generated constructor stub
+        activity= demoActivity;
         m_hHolder = this.getHolder();
         m_hHolder.addCallback(this);
         this.index = index;
@@ -78,10 +83,11 @@ public class PlaySurfaceView extends SurfaceView implements Callback {
     @Override
     public void surfaceCreated(SurfaceHolder arg0) {
         // TODO Auto-generated method stub
-        playSurfaceViewCallBack.surfaceCreated(arg0,index);
         System.out.println("surfaceCreated");
-
+        if (playSurfaceViewCallBack!=null)
+            playSurfaceViewCallBack.surfaceCreated(arg0,index);
     }
+
 
     @Override
     public void surfaceDestroyed(SurfaceHolder arg0) {
@@ -104,22 +110,41 @@ public class PlaySurfaceView extends SurfaceView implements Callback {
             Log.e(TAG, "please login on device first");
             return;
         }
-        NET_DVR_PREVIEWINFO previewInfo = new NET_DVR_PREVIEWINFO();
-        previewInfo.lChannel = iChan;
-        previewInfo.dwStreamType = 0; // substream
-        previewInfo.bBlocked = 1;
-        previewInfo.hHwnd = m_hHolder;
-        // HCNetSDK start preview
+        new MyPlayAsyncTask().execute(iUserID,iChan);
+    }
 
-        m_iPreviewHandle = HCNetSDK.getInstance().NET_DVR_RealPlay_V40(iUserID,
-                previewInfo, null);
-        if (m_iPreviewHandle < 0) {
-            Log.e(TAG, "NET_DVR_RealPlay is failed!Err:"
-                    + HCNetSDK.getInstance().NET_DVR_GetLastError());
+    class MyPlayAsyncTask extends AsyncTask<Integer,Integer,Integer>{
+
+        @Override
+        protected Integer doInBackground(Integer... integers) {
+            NET_DVR_PREVIEWINFO previewInfo = new NET_DVR_PREVIEWINFO();
+            previewInfo.lChannel = integers[1];
+            previewInfo.dwStreamType = 0; // substream
+            previewInfo.bBlocked = 1;
+            previewInfo.hHwnd = m_hHolder;
+            // HCNetSDK start preview
+
+            m_iPreviewHandle = HCNetSDK.getInstance().NET_DVR_RealPlay_V40(integers[0],
+                    previewInfo, null);
+            if (m_iPreviewHandle < 0) {
+                Log.e(TAG, "NET_DVR_RealPlay is failed!Err:"
+                        + HCNetSDK.getInstance().NET_DVR_GetLastError());
+
+            }
+            return null;
         }
     }
 
     public void stopPreview() {
-        HCNetSDK.getInstance().NET_DVR_StopRealPlay(m_iPreviewHandle);
+        new MyStopPreviewTask().execute("");
+    }
+
+    class MyStopPreviewTask extends AsyncTask<String,Integer,Integer>{
+
+        @Override
+        protected Integer doInBackground(String... strings) {
+            HCNetSDK.getInstance().NET_DVR_StopRealPlay(m_iPreviewHandle);
+            return null;
+        }
     }
 }
