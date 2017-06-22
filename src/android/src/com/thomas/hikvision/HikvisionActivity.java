@@ -331,7 +331,7 @@ public class HikvisionActivity extends Activity {
 						intent.putExtra("password",password);
 						intent.putExtra("index",index);
 						intent.putExtra("m_iStartChan",m_iStartChan);
-						stopMultiPreview();
+//						stopMultiPreview();
 						startActivity(intent);
 					}
 				});
